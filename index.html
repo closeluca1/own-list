@@ -270,8 +270,13 @@
                             } text-xs"></i>
                             ${todo.text}
                             </button>
-
-
+                            ${
+                            getCollapseState()[todo.id]
+                                ? `<span class="ml-2 text-sm text-gray-500">(${countPendingSubs(
+                                    todo.subs || []
+                                )})</span>`
+                                : ""
+                            }
                         </div>
                         <div class="flex gap-2">
                             <button onclick="openSubModal('${
@@ -452,7 +457,13 @@
                         } text-xs"></i>
                         ${todo.text}
                         </button>
-
+                        ${
+                          getCollapseState()[todo.id]
+                            ? `<span class="ml-2 text-sm text-gray-500">(${countPendingSubs(
+                                todo.subs || []
+                              )})</span>`
+                            : ""
+                        }
                     </div>
                     <div class="flex gap-2">
                         <button onclick="openSubModal('${
@@ -700,6 +711,22 @@
       collapseState[todoId] = !collapseState[todoId];
       setCollapseState(collapseState);
       openList(currentListId);
+    };
+
+    const countPendingSubs = (subs) => {
+      let total = 0;
+      let pending = 0;
+      const traverse = (list) => {
+        for (const s of list || []) {
+          if (s.isActive !== false) {
+            total++;
+            if (!s.done) pending++;
+            if (s.subs) traverse(s.subs);
+          }
+        }
+      };
+      traverse(subs);
+      return `${total - pending} / ${total}`;
     };
 
     const openModal = () =>
