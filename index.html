@@ -182,8 +182,8 @@
 
     const filterByActiveState = (data) =>
       showDeleted
-        ? data.filter((l) => !l.isActive)
-        : data.filter((l) => l.isActive !== false);
+        ? data.filter((l) => l && !l.isActive)
+        : data.filter((l) => l && l.isActive !== false);
 
     const isDescendant = (parent, targetId) => {
       if (!parent.subs) return false;
