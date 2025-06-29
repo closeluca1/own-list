@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>Own List – Gerenciador de Tarefas Pessoal</title>
+    <meta
+      name="description"
+      content="Gerencie suas listas e tarefas com subtarefas de forma simples e organizada. Projeto de código aberto por closeluca."
+    />
+    <meta name="author" content="closeluca" />
+    <meta
+      name="keywords"
+      content="lista de tarefas, to-do list, subtarefas, produtividade, JavaScript, Tailwind, projeto pessoal"
+    />
+
+    <meta
+      property="og:title"
+      content="Own List – Gerenciador de Tarefas Pessoal"
+    />
+    <meta
+      property="og:description"
+      content="Aplicativo simples de lista de tarefas com suporte a subtarefas e exclusão suave. Desenvolvido por closeluca."
+    />
+    <meta property="og:url" content="https://github.com/closeluca1" />
+    <meta property="og:type" content="website" />
+
+    <meta name="twitter:card" content="summary" />
+    <meta
+      name="twitter:title"
+      content="Own List – Gerenciador de Tarefas Pessoal"
+    />
+    <meta
+      name="twitter:description"
+      content="Projeto open-source de lista de tarefas com subtarefas e persistência local."
+    />
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+    <style>
+      .completed {
+        text-decoration: line-through;
+        opacity: 0.5;
+        transition: all 0.2s ease-in-out;
+      }
+      .modal {
+        background-color: rgba(0, 0, 0, 0.6);
+      }
+    </style>
+  </head>
+  <body class="bg-gray-100 min-h-screen p-6">
+    <div class="max-w-3xl mx-auto">
+      <h1 class="text-3xl font-bold mb-4" id="title-header">Own List</h1>
+
+      <div class="flex gap-2 mb-6" id="section-add-list">
+        <input
+          id="input-list-title"
+          type="text"
+          placeholder="Digite o título da lista"
+          class="flex-1 px-4 py-2 border rounded"
+        />
+        <button
+          id="btn-add-list"
+          class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"
+        >
+          Adicionar
+        </button>
+      </div>
+
+      <div class="flex gap-4 mb-4">
+        <button
+          id="btn-show-active"
+          class="bg-blue-500 text-white px-4 py-2 rounded"
+        >
+          Ativos
+        </button>
+        <button
+          id="btn-show-deleted"
+          class="bg-yellow-500 text-white px-4 py-2 rounded"
+        >
+          Excluídos
+        </button>
+      </div>
+
+      <div class="h-[70vh]">
+        <main id="container-lists" class="grid gap-4"></main>
+      </div>
+    </div>
+
+    <footer class="mt-12 py-4 border-t text-center text-sm text-gray-600">
+      Desenvolvido por
+      <a
+        href="https://github.com/closeluca1"
+        target="_blank"
+        class="text-blue-600 hover:underline font-semibold"
+        >closeluca</a
+      >
+      ·
+      <a
+        href="https://www.linkedin.com/in/p-luca/"
+        target="_blank"
+        class="text-blue-600 hover:underline font-semibold"
+        >LinkedIn</a
+      >
+    </footer>
+
+    <div
+      id="modal-task"
+      class="modal hidden fixed inset-0 flex items-center justify-center z-50"
+    >
+      <div class="bg-white rounded p-6 w-96">
+        <h2 class="text-lg font-bold mb-4">Adicionar Tarefa</h2>
+        <input
+          id="input-task"
+          type="text"
+          placeholder="Nova tarefa"
+          class="w-full px-3 py-2 border rounded mb-4"
+        />
+        <div class="flex justify-end gap-2">
+          <button id="btn-cancel-task" class="px-4 py-2">Cancelar</button>
+          <button
+            id="btn-save-task"
+            class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"
+          >
+            Salvar
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="modal-subtask"
+      class="modal hidden fixed inset-0 flex items-center justify-center z-50"
+    >
+      <div class="bg-white rounded p-6 w-96">
+        <h2 class="text-lg font-bold mb-4">Adicionar Sub-Tarefa</h2>
+        <input
+          id="input-subtask"
+          type="text"
+          placeholder="Sub tarefa"
+          class="w-full px-3 py-2 border rounded mb-4"
+        />
+        <div class="flex justify-end gap-2">
+          <button id="btn-cancel-subtask" class="px-4 py-2">Cancelar</button>
+          <button
+            id="btn-save-subtask"
+            class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"
+          >
+            Salvar
+          </button>
+        </div>
+      </div>
+    </div>
+  </body>
+
+  <script>
+    const localStorageKey = "ownList";
+    const collapseStateKey = "ownListCollapse";
+    const MAX_SUBTASK_DEPTH = 2;
+    let currentListId = null;
+    let currentTodoId = null;
+    let currentSubId = null;
+    let showDeleted = false;
+
+    const generateUUID = () => crypto.randomUUID();
+
+    const getData = () =>
+      JSON.parse(localStorage.getItem(localStorageKey)) || [];
+    const setData = (data) =>
+      localStorage.setItem(localStorageKey, JSON.stringify(data));
+
+    const getCollapseState = () =>
+      JSON.parse(localStorage.getItem(collapseStateKey)) || {};
+    const setCollapseState = (state) =>
+      localStorage.setItem(collapseStateKey, JSON.stringify(state));
+
+    const filterByActiveState = (data) =>
+      showDeleted
+        ? data.filter((l) => !l.isActive)
+        : data.filter((l) => l.isActive !== false);
+
+    const isDescendant = (parent, targetId) => {
+      if (!parent.subs) return false;
+      for (const sub of parent.subs) {
+        if (sub.id === targetId || isDescendant(sub, targetId)) return true;
+      }
+      return false;
+    };
+
+    const getSubtaskDepth = (sub, level = 1) => {
+      if (!sub.subs || sub.subs.length === 0) return level;
+      return Math.max(...sub.subs.map((s) => getSubtaskDepth(s, level + 1)));
+    };
+
+    const renderSubs = (subs, todoId, level = 1) => {
+      const collapseState = getCollapseState();
+      return subs
+        .filter((s) =>
+          showDeleted ? s.isActive === false : s.isActive !== false
+        )
+        .map((sub) => {
+          const isDeleted = sub.isActive === false;
+          const subTag = isDeleted
+            ? `<span class='ml-2 text-xs text-red-500'>(sub excluído)</span>`
+            : "";
+          const collapsed = collapseState[sub.id];
+          const children = renderSubs(sub.subs || [], todoId, level + 1);
+          return `
+        <div class="ml-${4 + level * 2} mt-2">
+          <div class="flex items-center">
+            <input type="checkbox" ${
+              sub.done ? "checked" : ""
+            } onchange="toggleSub('${todoId}', '${sub.id}')" class="mr-2" />
+            <span class="${sub.done ? "completed" : ""}">${sub.text}</span>
+            ${subTag}
+            <button onclick="openSubModalForSub('${todoId}', '${
+            sub.id
+          }')" class="ml-2 text-blue-400 hover:text-blue-600"><i class="fas fa-plus"></i></button>
+            ${
+              isDeleted
+                ? `<button onclick="restoreSub('${todoId}', '${sub.id}')" class="ml-2 text-green-500 hover:text-green-700"><i class='fas fa-undo'></i></button>`
+                : `<button onclick="softDeleteSub('${todoId}', '${sub.id}')" class="ml-2 text-red-400 hover:text-red-600"><i class="fas fa-trash"></i></button>`
+            }
+          </div>
+          ${collapsed ? "" : children}
+        </div>
+      `;
+        })
+        .join("");
+    };
+
+    const renderLists = () => {
+      const container = document.getElementById("container-lists");
+      if (currentListId) {
+        const data = getData();
+        const list = data.find((l) => l.id === currentListId);
+        const todos = showDeleted
+          ? list.todos.filter(
+              (t) =>
+                t.isActive === false ||
+                (t.subs || []).some((s) => s.isActive === false)
+            )
+          : list.todos.filter((t) => t.isActive !== false);
+
+        const todosHtml = todos
+          .map((todo) => {
+            const subsHtml = renderSubs(todo.subs || [], todo.id);
+            return `
+                    <div class="bg-white p-3 rounded shadow relative">
+                        <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <input type="checkbox" ${
+                              todo.done ? "checked" : ""
+                            } onchange="toggleTodo('${
+              todo.id
+            }')" class="mr-2" />
+                            <span class="${
+                              todo.done ? "completed" : ""
+                            } font-medium">${todo.text}</span>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="openSubModal('${
+                              todo.id
+                            }')" class="text-sm text-blue-500 hover:underline">+ Sub</button>
+                            ${
+                              todo.isActive === false
+                                ? `<button onclick="restoreTodo('${todo.id}')" class="text-green-500 hover:text-green-700"><i class="fas fa-undo"></i></button>`
+                                : `<button onclick="softDeleteTodo('${todo.id}')" class="text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button>`
+                            }
+                        </div>
+                        </div>
+                        ${subsHtml}
+                    </div>
+                    `;
+          })
+          .join("");
+
+        const restoreAllBtn = showDeleted
+          ? `<button onclick="restoreAllItems()" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded">Restaurar Todos</button>`
+          : "";
+        const deletedTag = showDeleted
+          ? `<span class='text-sm text-red-600 font-semibold'>Modo: Excluídos</span>`
+          : "";
+
+        container.innerHTML = `
+                <div class="flex justify-between items-center mb-2">
+                    ${deletedTag}
+                    ${restoreAllBtn}
+                </div>
+                <button onclick="openModal()" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded mb-4">
+                    + Tarefa
+                </button>
+                <div class="space-y-2">${todosHtml}</div>
+                <button onclick="closeListView()" class="mt-6 text-blue-600 hover:underline">Voltar</button>
+                `;
+
+        toggleHeaderVisibility();
+
+        return;
+      }
+
+      container.innerHTML = "";
+      const data = filterByActiveState(getData());
+
+      data.forEach((list, index) => {
+        const countNestedSubs = (subs) => {
+          let count = 0;
+          let completed = 0;
+          for (const sub of subs || []) {
+            if (sub.isActive !== false) {
+              count++;
+              if (sub.done) completed++;
+              const [c, d] = countNestedSubs(sub.subs || []);
+              count += c;
+              completed += d;
+            }
+          }
+          return [count, completed];
+        };
+
+        const total = list.todos.reduce(
+          (acc, todo) => {
+            if (todo.isActive === false) return acc;
+            let count = 1;
+            let completed = todo.done ? 1 : 0;
+            const [nestedCount, nestedDone] = countNestedSubs(todo.subs || []);
+            count += nestedCount;
+            completed += nestedDone;
+            acc.total += count;
+            acc.completed += completed;
+            return acc;
+          },
+          { total: 0, completed: 0 }
+        );
+
+        const card = document.createElement("section");
+        card.className =
+          "bg-white p-4 rounded shadow relative w-full cursor-move";
+        card.innerHTML = `
+      <div class="flex justify-between items-center mb-2">
+        <div>
+          <h2 class="font-bold text-lg cursor-pointer" onclick="openList('${
+            list.id
+          }')">${list.title}</h2>
+          <p class="text-sm">${total.completed} marcados / ${
+          total.total - total.completed
+        } restantes</p>
+        </div>
+        <div class="flex gap-2">
+          ${
+            list.isActive === false
+              ? `<button onclick="restoreList('${list.id}')" class="text-green-500 hover:text-green-700"><i class="fas fa-undo"></i></button>`
+              : `<button onclick="softDeleteList('${list.id}')" class="text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button>`
+          }
+        </div>
+      </div>
+    `;
+        container.appendChild(card);
+      });
+
+      Sortable.create(container, {
+        animation: 150,
+        onEnd: function (evt) {
+          const data = getData();
+          const [removed] = data.splice(evt.oldIndex, 1);
+          data.splice(evt.newIndex, 0, removed);
+          setData(data);
+          renderLists();
+        },
+      });
+    };
+
+    const addList = () => {
+      const input = document.getElementById("input-list-title");
+      const title = input.value.trim();
+      if (!title) return;
+      const data = getData();
+      if (data.some((list) => list.title === title))
+        return alert("Nome já existe");
+
+      data.push({ id: generateUUID(), title, todos: [], isActive: true });
+      setData(data);
+      input.value = "";
+      renderLists();
+    };
+
+    const softDeleteList = (id) => {
+      const data = getData();
+      const list = data.find((l) => l.id === id);
+      list.isActive = false;
+      setData(data);
+      renderLists();
+    };
+
+    const restoreList = (id) => {
+      const data = getData();
+      const list = data.find((l) => l.id === id);
+      list.isActive = true;
+      setData(data);
+      renderLists();
+    };
+
+    const openList = (listId) => {
+      const data = getData();
+      const list = data.find((l) => l.id === listId);
+      currentListId = listId;
+      const container = document.getElementById("container-lists");
+
+      const todos = showDeleted
+        ? list.todos.filter(
+            (t) =>
+              t.isActive === false ||
+              (t.subs || []).some((s) => s.isActive === false)
+          )
+        : list.todos.filter((t) => t.isActive !== false);
+
+      const todosHtml = todos
+        .map((todo) => {
+          const subs = todo.subs || [];
+          const subHtml = renderSubs(subs, todo.id);
+          return `
+                <div class="bg-white p-3 rounded shadow relative">
+                    <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                        <input type="checkbox" ${
+                          todo.done ? "checked" : ""
+                        } onchange="toggleTodo('${todo.id}')" class="mr-2" />
+                        <span class="${
+                          todo.done ? "completed" : ""
+                        } font-medium">${todo.text}</span>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="openSubModal('${
+                          todo.id
+                        }')" class="text-sm text-blue-500 hover:underline">+ Sub</button>
+                        ${
+                          todo.isActive === false
+                            ? `<button onclick="restoreTodo('${todo.id}')" class="text-green-500 hover:text-green-700"><i class="fas fa-undo"></i></button>`
+                            : `<button onclick="softDeleteTodo('${todo.id}')" class="text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button>`
+                        }
+                    </div>
+                    </div>
+                    ${subHtml}
+                </div>
+                `;
+        })
+        .join("");
+
+      const restoreAllBtn = showDeleted
+        ? `<button onclick="restoreAllItems()" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded">Restaurar Todos</button>`
+        : "";
+      const deletedTag = showDeleted
+        ? `<span class='text-sm text-red-600 font-semibold'>Modo: Excluídos</span>`
+        : "";
+
+      container.innerHTML = `
+            <div class="flex justify-between items-center mb-2">
+                ${deletedTag}
+                ${restoreAllBtn}
+            </div>
+            <button onclick="openModal()" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded mb-4">
+                + Tarefa
+            </button>
+            <div class="space-y-2">${todosHtml}</div>
+            <button onclick="closeListView()" class="mt-6 text-blue-600 hover:underline">Voltar</button>
+            `;
+
+      toggleHeaderVisibility();
+    };
+
+    const closeListView = () => {
+      currentListId = null;
+      toggleHeaderVisibility();
+      renderLists();
+    };
+
+    const openSubModalForSub = (todoId, subId) => {
+      currentTodoId = todoId;
+      currentSubId = subId;
+      const input = document.getElementById("input-subtask");
+      input.placeholder = "Sub de sub-tarefa";
+      document.getElementById("modal-subtask").classList.remove("hidden");
+    };
+
+    const addSubToTodo = () => {
+      const input = document.getElementById("input-subtask");
+      const text = input.value.trim();
+      if (!text) return;
+      const data = getData();
+      const list = data.find((l) => l.id === currentListId);
+      const todo = list.todos.find((t) => t.id === currentTodoId);
+
+      if (currentSubId) {
+        const findSubRecursive = (subs, id) => {
+          for (const s of subs) {
+            if (s.id === id) return s;
+            if (s.subs) {
+              const found = findSubRecursive(s.subs, id);
+              if (found) return found;
+            }
+          }
+          return null;
+        };
+
+        const parentSub = findSubRecursive(todo.subs || [], currentSubId);
+        if (!parentSub.subs) parentSub.subs = [];
+
+        const depth = getSubtaskDepth(parentSub);
+        if (depth >= MAX_SUBTASK_DEPTH) {
+          alert(`Limite de profundidade (${MAX_SUBTASK_DEPTH}) atingido`);
+          return;
+        }
+
+        if (parentSub.subs.some((s) => s.text === text && s.isActive !== false))
+          return alert("Sub de sub-tarefa já existe");
+
+        parentSub.subs.push({
+          id: generateUUID(),
+          text,
+          done: false,
+          isActive: true,
+        });
+      } else {
+        if (todo.subs.some((s) => s.text === text && s.isActive !== false))
+          return alert("Sub-tarefa já existe");
+        todo.subs.push({
+          id: generateUUID(),
+          text,
+          done: false,
+          isActive: true,
+        });
+      }
+
+      input.value = "";
+      currentSubId = null;
+      document.getElementById("modal-subtask").classList.add("hidden");
+      setData(data);
+      openList(currentListId);
+    };
+
+    const addTodoToList = () => {
+      const input = document.getElementById("input-task");
+      const text = input.value.trim();
+      if (!text) return;
+      const data = getData();
+      const list = data.find((l) => l.id === currentListId);
+      if (list.todos.some((t) => t.text === text && t.isActive !== false))
+        return alert("Tarefa já existe");
+      list.todos.push({
+        id: generateUUID(),
+        text,
+        done: false,
+        subs: [],
+        isActive: true,
+      });
+      setData(data);
+      input.value = "";
+      closeModal();
+      openList(currentListId);
+    };
+
+    const softDeleteTodo = (todoId) => {
+      const data = getData();
+      const list = data.find((l) => l.id === currentListId);
+      const todo = list.todos.find((t) => t.id === todoId);
+      todo.isActive = false;
+      setData(data);
+      openList(currentListId);
+    };
+
+    const softDeleteSub = (todoId, subId) => {
+      const data = getData();
+      const list = data.find((l) => l.id === currentListId);
+      const todo = list.todos.find((t) => t.id === todoId);
+
+      const markRecursiveInactive = (subs, id) => {
+        for (const s of subs) {
+          if (s.id === id) {
+            const markAll = (subtree) => {
+              subtree.isActive = false;
+              if (subtree.subs) {
+                subtree.subs.forEach(markAll);
+              }
+            };
+            markAll(s);
+            return true;
+          }
+          if (s.subs && markRecursiveInactive(s.subs, id)) return true;
+        }
+        return false;
+      };
+
+      markRecursiveInactive(todo.subs, subId);
+      setData(data);
+      openList(currentListId);
+    };
+
+    const restoreSub = (todoId, subId) => {
+      const data = getData();
+      const list = data.find((l) => l.id === currentListId);
+      const todo = list.todos.find((t) => t.id === todoId);
+
+      const restoreRecursive = (subs, id) => {
+        for (const s of subs) {
+          if (s.id === id) {
+            const restoreAll = (subtree) => {
+              subtree.isActive = true;
+              if (subtree.subs) {
+                subtree.subs.forEach(restoreAll);
+              }
+            };
+            restoreAll(s);
+            return true;
+          }
+          if (s.subs && restoreRecursive(s.subs, id)) return true;
+        }
+        return false;
+      };
+
+      restoreRecursive(todo.subs, subId);
+      setData(data);
+      openList(currentListId);
+    };
+
+    const restoreTodo = (todoId) => {
+      const data = getData();
+      const list = data.find((l) => l.id === currentListId);
+      const todo = list.todos.find((t) => t.id === todoId);
+      todo.isActive = true;
+
+      // Também restaura subtarefas recursivamente
+      const restoreSubsRecursive = (subs) => {
+        for (const sub of subs) {
+          sub.isActive = true;
+          if (sub.subs) restoreSubsRecursive(sub.subs);
+        }
+      };
+      restoreSubsRecursive(todo.subs || []);
+
+      setData(data);
+      openList(currentListId);
+    };
+
+    const toggleTodo = (todoId) => {
+      const data = getData();
+      const list = data.find((l) => l.id === currentListId);
+      const todo = list.todos.find((t) => t.id === todoId);
+      todo.done = !todo.done;
+      setData(data);
+      openList(currentListId);
+    };
+
+    const toggleSub = (todoId, subId) => {
+      const data = getData();
+      const list = data.find((l) => l.id === currentListId);
+      const todo = list.todos.find((t) => t.id === todoId);
+      const sub = todo.subs.find((s) => s.id === subId);
+      sub.done = !sub.done;
+      setData(data);
+      openList(currentListId);
+    };
+
+    const toggleHeaderVisibility = () => {
+      const isViewingCard = !!currentListId;
+      document.getElementById("title-header").style.display = isViewingCard
+        ? "none"
+        : "";
+      document.getElementById("section-add-list").style.display = isViewingCard
+        ? "none"
+        : "";
+    };
+
+    const openModal = () =>
+      document.getElementById("modal-task").classList.remove("hidden");
+    const closeModal = () => {
+      document.getElementById("modal-task").classList.add("hidden");
+      document.getElementById("input-task").value = "";
+    };
+    const openSubModal = (todoId) => {
+      currentTodoId = todoId;
+      document.getElementById("modal-subtask").classList.remove("hidden");
+    };
+    const closeSubModal = () => {
+      document.getElementById("modal-subtask").classList.add("hidden");
+      document.getElementById("input-subtask").value = "";
+    };
+
+    document.getElementById("btn-add-list").onclick = addList;
+    document.getElementById("btn-show-active").onclick = () => {
+      showDeleted = false;
+      renderLists();
+    };
+    document.getElementById("btn-show-deleted").onclick = () => {
+      showDeleted = true;
+      renderLists();
+    };
+    document.getElementById("btn-save-task").onclick = addTodoToList;
+    document.getElementById("btn-cancel-task").onclick = closeModal;
+    document.getElementById("btn-save-subtask").onclick = addSubToTodo;
+    document.getElementById("btn-cancel-subtask").onclick = closeSubModal;
+
+    renderLists();
+  </script>
+</html>
