@@ -25,3 +25,9 @@
 - TailwindCSS
 - FontAwesome
 - LocalStorage
+
+  ---
+
+  ![image](https://github.com/user-attachments/assets/4d86c928-4292-4c93-8664-a85c552f53df)
+
+![image](https://github.com/user-attachments/assets/1f2155c9-adb4-469a-abf7-90172b38095c)
